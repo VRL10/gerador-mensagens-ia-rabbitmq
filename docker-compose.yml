@@ -1,0 +1,73 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: trabalho06-rabbitmq
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - trabalho06-net
+
+  generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: generator
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - trabalho06-net
+
+  consumer-plate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: consumer-plate
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - trabalho06-net
+
+  consumer-sign:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: consumer-sign
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - trabalho06-net
+
+networks:
+  trabalho06-net:
+    driver: bridge
