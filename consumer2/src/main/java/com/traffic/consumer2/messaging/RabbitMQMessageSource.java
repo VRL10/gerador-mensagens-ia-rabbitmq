@@ -1,5 +1,6 @@
 package com.traffic.consumer2.messaging;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.*;
 import com.traffic.consumer2.config.AppConfig;
@@ -8,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -146,18 +148,36 @@ public class RabbitMQMessageSource implements MessageSource {
 
     // ── Internos ─────────────────────────────────────────────────────────────
     private TrafficSignMessage deserialize(byte[] body) throws Exception {
-        String json = new String(body);
+        String json = new String(body, StandardCharsets.UTF_8);
         TrafficSignMessage msg;
+
         try {
+            // Primeiro tenta consumir o formato interno do consumidor
             msg = mapper.readValue(json, TrafficSignMessage.class);
-        } catch (Exception e) {
-            // Fallback: se a mensagem for JSON simples de features, encapsula como metadata
-            msg = new TrafficSignMessage();
-            msg.setMessageId(java.util.UUID.randomUUID().toString());
-            msg.setTimestamp(Instant.now());
-            msg.setRoutingKey("sign");
-            msg.setMetadata(json);
+            return msg;
+        } catch (Exception ignored) {
+            // Continua para tentar mapear o formato do gerador
         }
+
+        JsonNode root = mapper.readTree(json);
+        if (root.has("id") && root.has("imageBase64")) {
+            msg = new TrafficSignMessage();
+            msg.setMessageId(root.path("id").asText(java.util.UUID.randomUUID().toString()));
+            msg.setTimestamp(Instant.ofEpochMilli(root.path("createdAtEpochMillis").asLong(System.currentTimeMillis())));
+            msg.setRoutingKey("sign");
+            msg.setImageDataBase64(root.path("imageBase64").asText(null));
+            if (root.has("signType")) {
+                msg.setMetadata(mapper.writeValueAsString(root.path("signType")));
+            }
+            return msg;
+        }
+
+        // Fallback: se a mensagem for JSON simples de features, encapsula como metadata
+        msg = new TrafficSignMessage();
+        msg.setMessageId(java.util.UUID.randomUUID().toString());
+        msg.setTimestamp(Instant.now());
+        msg.setRoutingKey("sign");
+        msg.setMetadata(json);
         return msg;
     }
 
