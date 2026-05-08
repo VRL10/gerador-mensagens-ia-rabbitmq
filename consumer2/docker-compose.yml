@@ -1,43 +1,10 @@
 services:
-  consumer2:
-    build: .
-    image: traffic/consumer2:latest
-    container_name: consumer2-sign-classifier
-    environment:
-      USE_MOCK: "true"
-      MOCK_RATE_MS: "1500"          # 1 msg a cada 1.5s (mais lento que o produtor)
-    networks:
-      - traffic-net
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: rabbitmq
-    profiles:
-      - real
-    ports:
-      - "5672:5672"
-      - "15672:15672"    # UI admin → http://localhost:15672  (guest/guest)
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - traffic-net
-
   consumer2-real:
     build: .
     image: traffic/consumer2:latest
     container_name: consumer2-sign-classifier-real
     profiles:
       - real
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
     environment:
       USE_MOCK: "false"
       RABBITMQ_HOST: rabbitmq
@@ -45,14 +12,11 @@ services:
       RABBITMQ_USER: guest
       RABBITMQ_PASS: guest
       RABBITMQ_VHOST: /
-      EXCHANGE_NAME: traffic.exchange
-      QUEUE_NAME: sign.queue
+      EXCHANGE_NAME: trabalho06.topic
+      QUEUE_NAME: trabalho06.signs
       ROUTING_KEY: sign
     networks:
-      - traffic-net
-    restart: on-failure
-
+      - gerador-mensagens-ia-rabbitmq_trabalho06-net  
 networks:
-  traffic-net:
-    name: traffic-net       # mesma network que os outros serviços devem usar
-    driver: bridge
+  gerador-mensagens-ia-rabbitmq_trabalho06-net:
+    external: true 
